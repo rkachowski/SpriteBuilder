@@ -115,6 +115,8 @@
 		835DB0CB17156421003A2F7B /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 835DB0CA17156421003A2F7B /* Security.framework */; };
 		8392006F18ED91BC00B6C429 /* Cocos2dUpdater.m in Sources */ = {isa = PBXBuildFile; fileRef = 8392006C18ED91BC00B6C429 /* Cocos2dUpdater.m */; };
 		8392007018ED91BC00B6C429 /* Cocos2dUpdater+Errors.m in Sources */ = {isa = PBXBuildFile; fileRef = 8392006E18ED91BC00B6C429 /* Cocos2dUpdater+Errors.m */; };
+		83AF22C518F6A3900073E56B /* XCodeRun.m in Sources */ = {isa = PBXBuildFile; fileRef = 83AF22C418F6A3900073E56B /* XCodeRun.m */; };
+		83AF22C818F6BB240073E56B /* runInXcode.AppleScript in Resources */ = {isa = PBXBuildFile; fileRef = 83AF22C718F6BB240073E56B /* runInXcode.AppleScript */; };
 		83DC65EA18D898D50028EF72 /* SBUserDefaultsKeys.m in Sources */ = {isa = PBXBuildFile; fileRef = 83DC65E918D898D50028EF72 /* SBUserDefaultsKeys.m */; };
 		83F8673418D1DCEA007441E4 /* SBErrors.m in Sources */ = {isa = PBXBuildFile; fileRef = 83F8673318D1DCEA007441E4 /* SBErrors.m */; };
 		92154AC718A5531800BD215C /* CCBPProperties.plist in Resources */ = {isa = PBXBuildFile; fileRef = 92154ABF18A5531800BD215C /* CCBPProperties.plist */; };
@@ -1182,6 +1184,9 @@
 		8392006C18ED91BC00B6C429 /* Cocos2dUpdater.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Cocos2dUpdater.m; sourceTree = "<group>"; };
 		8392006D18ED91BC00B6C429 /* Cocos2dUpdater+Errors.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "Cocos2dUpdater+Errors.h"; sourceTree = "<group>"; };
 		8392006E18ED91BC00B6C429 /* Cocos2dUpdater+Errors.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "Cocos2dUpdater+Errors.m"; sourceTree = "<group>"; };
+		83AF22C318F6A3900073E56B /* XCodeRun.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = XCodeRun.h; sourceTree = "<group>"; };
+		83AF22C418F6A3900073E56B /* XCodeRun.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = XCodeRun.m; sourceTree = "<group>"; };
+		83AF22C718F6BB240073E56B /* runInXcode.AppleScript */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.applescript; path = runInXcode.AppleScript; sourceTree = "<group>"; };
 		83DC65E818D898D50028EF72 /* SBUserDefaultsKeys.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SBUserDefaultsKeys.h; sourceTree = "<group>"; };
 		83DC65E918D898D50028EF72 /* SBUserDefaultsKeys.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SBUserDefaultsKeys.m; sourceTree = "<group>"; };
 		83F8673218D1DCEA007441E4 /* SBErrors.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SBErrors.h; sourceTree = "<group>"; };
@@ -2807,6 +2812,7 @@
 		7789ABC8133AA82000CEFCC7 /* SpriteBuilder */ = {
 			isa = PBXGroup;
 			children = (
+				83AF22C118F6A36C0073E56B /* XCodeRun */,
 				B78B8B0E185FE6A0006ADBBE /* SpriteBuilder.entitlements */,
 				B72D1DBF186125E80091252F /* Requirements.plist */,
 				D2E0167218D782B500927430 /* SpriteBuilderCommands */,
@@ -2880,6 +2886,7 @@
 		7789ACEB133AB6A700CEFCC7 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				83AF22C618F6BAF90073E56B /* scripts */,
 				DC0A8D3E18C8C274009A619D /* SpriteKitTextureAtlasToolPath.txt */,
 				B7AC69DB17A9D9700041B8BD /* defaultTemplates.zip */,
 				E390C780170A371E003E9E92 /* Generated */,
@@ -2991,6 +2998,23 @@
 				8392006E18ED91BC00B6C429 /* Cocos2dUpdater+Errors.m */,
 			);
 			name = Cocos2dUpdater;
+			sourceTree = "<group>";
+		};
+		83AF22C118F6A36C0073E56B /* XCodeRun */ = {
+			isa = PBXGroup;
+			children = (
+				83AF22C318F6A3900073E56B /* XCodeRun.h */,
+				83AF22C418F6A3900073E56B /* XCodeRun.m */,
+			);
+			name = XCodeRun;
+			sourceTree = "<group>";
+		};
+		83AF22C618F6BAF90073E56B /* scripts */ = {
+			isa = PBXGroup;
+			children = (
+				83AF22C718F6BB240073E56B /* runInXcode.AppleScript */,
+			);
+			name = scripts;
 			sourceTree = "<group>";
 		};
 		83F8672F18D1DCBD007441E4 /* Constants */ = {
@@ -4899,6 +4923,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				83AF22C818F6BB240073E56B /* runInXcode.AppleScript in Resources */,
 				921EEADD18A5760700D864C2 /* joint-pivot@2x.png in Resources */,
 				92F12E4E18847BC800AB8F32 /* seq-keyframe-x4-sel.png in Resources */,
 				92F12E4F18847BC800AB8F32 /* seq-keyframe-x4.png in Resources */,
@@ -5512,6 +5537,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				92B792D318C92FEF007DF895 /* CCBPhysicsTwoBodyJoint.m in Sources */,
+				83AF22C518F6A3900073E56B /* XCodeRun.m in Sources */,
 				92B792D218C92FE7007DF895 /* CCBPhysicsSpringJoint.m in Sources */,
 				9294EC8E18C65EC10059014C /* CCBPhysicsPinJoint.m in Sources */,
 				9294EC8F18C65EC10059014C /* CCBPhysicsPivotJoint.m in Sources */,

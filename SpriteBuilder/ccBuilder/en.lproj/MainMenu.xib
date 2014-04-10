@@ -1301,7 +1301,7 @@ CA
                                 <autoresizingMask key="autoresizingMask"/>
                                 <subviews>
                                     <openGLView colorSize="8bit_RGB_8bit_Alpha" useAuxiliaryDepthBufferStencil="NO" useDoubleBufferingEnabled="YES" allowOffline="YES" id="603" customClass="CCBGLView">
-                                        <rect key="frame" x="0.0" y="0.0" width="601" height="549"/>
+                                        <rect key="frame" x="0.0" y="0.0" width="601" height="300"/>
                                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                         <connections>
                                             <outlet property="appDelegate" destination="494" id="1348"/>
@@ -2228,6 +2228,18 @@ CA
                             </binding>
                         </connections>
                     </toolbarItem>
+                    <toolbarItem implicitItemIdentifier="B18CF8AD-FEE8-48D0-A3A0-BDB06A6F4454" label="Run" paletteLabel="Run" tag="-1" image="TB_play" autovalidates="NO" id="OvU-DF-P9Z">
+                        <size key="minSize" width="40" height="0.0"/>
+                        <size key="maxSize" width="40" height="0.0"/>
+                        <connections>
+                            <action selector="runProjectInXcode:" target="494" id="mNs-CH-2C8"/>
+                            <binding destination="494" name="enabled" keyPath="projectSettings" id="69K-ip-Cy2">
+                                <dictionary key="options">
+                                    <string key="NSValueTransformerName">NSIsNotNil</string>
+                                </dictionary>
+                            </binding>
+                        </connections>
+                    </toolbarItem>
                     <toolbarItem implicitItemIdentifier="0ED4D287-F74F-44EF-9AE8-E629E80A81DD" label="Custom View" paletteLabel="Custom View" id="9vz-Yr-LRc" userLabel="Toolbar Item - Publish Environment">
                         <nil key="toolTip"/>
                         <size key="minSize" width="100" height="25"/>
@@ -2237,7 +2249,7 @@ CA
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                             <popUpButtonCell key="cell" type="roundTextured" bezelStyle="texturedRounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" altersStateOfSelectedItem="NO" id="zR9-Ke-yNX">
                                 <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
-                                <font key="font" metaFont="system"/>
+                                <font key="font" metaFont="menu"/>
                                 <menu key="menu" title="OtherViews" id="DhV-ki-Vxj">
                                     <items>
                                         <menuItem title="Develop" id="8uA-4D-gxr"/>
@@ -2255,10 +2267,13 @@ CA
                             </connections>
                         </popUpButton>
                     </toolbarItem>
+                    <toolbarItem implicitItemIdentifier="NSToolbarSeparatorItem" id="Tye-fR-NfC"/>
                 </allowedToolbarItems>
                 <defaultToolbarItems>
                     <toolbarItem reference="Nkp-mV-yYQ"/>
                     <toolbarItem reference="9vz-Yr-LRc"/>
+                    <toolbarItem reference="Tye-fR-NfC"/>
+                    <toolbarItem reference="OvU-DF-P9Z"/>
                     <toolbarItem reference="1358"/>
                     <toolbarItem reference="1788"/>
                 </defaultToolbarItems>
@@ -2655,6 +2670,7 @@ CA
         <image name="TB_bottomPanel" width="25" height="22"/>
         <image name="TB_build" width="32" height="32"/>
         <image name="TB_leftPanel" width="25" height="22"/>
+        <image name="TB_play" width="32" height="32"/>
         <image name="TB_plugins" width="36" height="16"/>
         <image name="TB_rightPanel" width="25" height="22"/>
         <image name="btn-dropdown-arrows" width="16" height="9"/>

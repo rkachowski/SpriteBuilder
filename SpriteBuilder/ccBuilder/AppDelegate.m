@@ -114,6 +114,7 @@
 #import "SBErrors.h"
 #import "NSArray+Query.h"
 #import "Cocos2dUpdater.h"
+#import "XCodeRun.h"
 
 static const int CCNODE_INDEX_LAST = -1;
 
@@ -3055,6 +3056,13 @@ static BOOL hideAllToNextSeparator;
 - (IBAction) menuPublishProjectAndRun:(id)sender
 {
     [self publishAndRun:YES runInBrowser:NULL async:YES];
+}
+
+- (IBAction)runProjectInXcode:(id)sender
+{
+    XCodeRun *xCodeRun = [[XCodeRun alloc] init];
+    NSString *xcodePrj = [projectSettings.projectPath stringByReplacingOccurrencesOfString:@".ccbproj" withString:@".xcodeproj"];
+    [xCodeRun runProject:xcodePrj];
 }
 
 - (IBAction)menuPublishProjectAndRunInBrowser:(id)sender

@@ -428,6 +428,7 @@ enum {
 // Publishing & running
 - (void) publisher:(CCBPublisher*)publisher finishedWithWarnings:(CCBWarnings*)warnings;
 - (IBAction) menuPublishProjectAndRun:(id)sender;
+- (IBAction)runProjectInXcode:(id)sender;
 
 // For warning messages
 - (void) modalDialogTitle: (NSString*)title message:(NSString*)msg;
