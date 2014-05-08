@@ -17,8 +17,8 @@
 @end
 
 
-const float kMargin = 8.0f/64.0f;
-const float kEdgeRadius = 8.0f;
+const float kMargin = 9.0f/36.0f;
+const float kEdgeRadius = 9.0f;
 
 static const float kDefaultLength = 58.0f;
 
@@ -27,6 +27,10 @@ static const float kDefaultLength = 58.0f;
 {
     CCSprite        * anchorHandleA;
     CCSprite        * anchorHandleB;
+    
+    CCSpriteFrame   * distanceJointFrame;
+    CCSpriteFrame   * distanceJointFrameSel;
+    
 }
 @end
 
@@ -50,6 +54,8 @@ static const float kDefaultLength = 58.0f;
     [scaleFreeNode addChild:anchorHandleB];
 
     
+    distanceJointFrameSel = [CCSpriteFrame frameWithImageNamed:@"joint-distance-sel.png"];
+    distanceJointFrame    = [CCSpriteFrame frameWithImageNamed:@"joint-distance.png"];
 }
 
 
@@ -91,11 +97,11 @@ static const float kDefaultLength = 58.0f;
     //If selected, display selected sprites.
     if(selectedBodyHandle & (1 << EntireJoint))
     {
-        jointBody.spriteFrame = [CCSpriteFrame frameWithImageNamed:@"joint-distance-sel.png"];
+        jointBody.spriteFrame = distanceJointFrameSel;
     }
     else //Unseleted
     {
-        jointBody.spriteFrame = [CCSpriteFrame frameWithImageNamed:@"joint-distance.png"];
+        jointBody.spriteFrame = distanceJointFrame;
     }
 
     [super updateSelectionUI];
@@ -115,12 +121,8 @@ static const float kDefaultLength = 58.0f;
     jointBody.anchorPoint = ccp(kEdgeRadius/jointBody.contentSize.width, 0.5f);
     self.rotation = [self rotation];
 
-    
-    
     //Anchor B
     anchorHandleB.position = ccpMult(ccp(length,0),[CCDirector sharedDirector].UIScaleFactor);
-    
-    
 }
 
 
@@ -146,7 +148,6 @@ static const float kDefaultLength = 58.0f;
 {
     {
         CGPoint pointA = [anchorHandleA convertToNodeSpaceAR:worlPos];
-        pointA = ccpAdd(pointA, ccp(0,3.0f * [CCDirector sharedDirector].UIScaleFactor));
         if(ccpLength(pointA) < 4.0f* [CCDirector sharedDirector].UIScaleFactor)
         {
             return BodyAnchorA;
@@ -155,7 +156,6 @@ static const float kDefaultLength = 58.0f;
     
     {
         CGPoint pointB = [anchorHandleB convertToNodeSpaceAR:worlPos];
-        pointB = ccpAdd(pointB, ccp(0,3.0f * [CCDirector sharedDirector].UIScaleFactor));
         if(ccpLength(pointB) < 4.0f* [CCDirector sharedDirector].UIScaleFactor)
         {
             return BodyAnchorB;
@@ -173,15 +173,24 @@ static const float kDefaultLength = 58.0f;
     CGPoint anchorBWorldpos = [anchorHandleB convertToWorldSpace:CGPointZero];
     
     
-    float distance = [GeometryUtil distanceFromLineSegment:anchorAWorldpos b:anchorBWorldpos c:pos];
-    
-    if(distance < 8.0f)
+    float distance1 = [GeometryUtil distanceFromLineSegment:anchorAWorldpos b:anchorBWorldpos c:pos];
+	float distance2 = ccpLength([anchorHandleA convertToNodeSpaceAR:pos]);
+	float distance3 = ccpLength([anchorHandleB convertToNodeSpaceAR:pos]);
+	
+	float minDistance =  fminf(fminf(distance1, distance2),distance3);
+	
+    if(minDistance < 8.0f)
     {
         return YES;
     }
     
     return NO;
     
+}
+
+-(BOOL)isDraggable
+{
+	return !self.bodyA || !self.bodyB;
 }
 
 
@@ -223,9 +232,14 @@ static const float kDefaultLength = 58.0f;
     [super setBodyHandle:worldPos bodyType:bodyType];
 }
 
--(float)outletLateralOffset
+-(float)outletHorizontalOffset
 {
     return 58.0/2.0f;
+}
+
+-(float)outletVerticalOffset
+{
+    return 20.0f;
 }
 
 

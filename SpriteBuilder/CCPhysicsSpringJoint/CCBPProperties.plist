@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>ordering</key>
-	<integer>3000</integer>
+	<real>3300</real>
 	<key>displayName</key>
 	<string>Physics Spring Joint</string>
 	<key>description</key>
-	<string>Creates a Spring joint that with a fixed elastic length that connects two bodies.</string>
+	<string>Connects two physics bodies with an elastic spring.</string>
 	<key>inheritsFrom</key>
-	<string>CCPhysicsPivotJoint</string>
+	<string>NSObject</string>
 	<key>canHaveChildren</key>
 	<false/>
 	<key>canBeRootNode</key>
@@ -40,7 +40,77 @@
 			<key>animatable</key>
 			<false/>
 			<key>displayName</key>
-			<string>AnchorB</string>
+			<string>Position</string>
+			<key>type</key>
+			<string>Position</string>
+			<key>name</key>
+			<string>position</string>
+			<key>inspectorDisabled</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>default</key>
+			<integer>0</integer>
+			<key>affectsProperties</key>
+			<array>
+				<string>bodyA</string>
+			</array>
+			<key>displayName</key>
+			<string>Body A</string>
+			<key>type</key>
+			<string>NodeReference</string>
+			<key>name</key>
+			<string>bodyA</string>
+		</dict>
+		<dict>
+			<key>default</key>
+			<integer>0</integer>
+			<key>affectsProperties</key>
+			<array>
+				<string>bodyB</string>
+			</array>
+			<key>displayName</key>
+			<string>Body B</string>
+			<key>type</key>
+			<string>NodeReference</string>
+			<key>name</key>
+			<string>bodyB</string>
+		</dict>
+		<dict>
+			<key>displayName</key>
+			<string>Collide bodies</string>
+			<key>type</key>
+			<string>Check</string>
+			<key>name</key>
+			<string>collideBodies</string>
+		</dict>
+		<dict>
+			<key>defaultSerialization</key>
+			<array>
+				<integer>0</integer>
+				<integer>0</integer>
+				<integer>0</integer>
+			</array>
+			<key>animatable</key>
+			<false/>
+			<key>displayName</key>
+			<string>Anchor A</string>
+			<key>type</key>
+			<string>Point</string>
+			<key>name</key>
+			<string>anchorA</string>
+		</dict>
+		<dict>
+			<key>defaultSerialization</key>
+			<array>
+				<integer>0</integer>
+				<integer>0</integer>
+				<integer>0</integer>
+			</array>
+			<key>animatable</key>
+			<false/>
+			<key>displayName</key>
+			<string>Anchor B</string>
 			<key>type</key>
 			<string>Point</string>
 			<key>name</key>
@@ -50,11 +120,31 @@
 			<key>defaultSerialization</key>
 			<integer>0</integer>
 			<key>type</key>
-			<string>Float</string>
+			<string>FloatCheck</string>
+			<key>name</key>
+			<string>breakingForce</string>
+			<key>displayName</key>
+			<string>Breaking force</string>
+		</dict>
+		<dict>
+			<key>defaultSerialization</key>
+			<integer>0</integer>
+			<key>type</key>
+			<string>FloatCheck</string>
+			<key>name</key>
+			<string>maxForce</string>
+			<key>displayName</key>
+			<string>Max force</string>
+		</dict>
+		<dict>
+			<key>defaultSerialization</key>
+			<integer>0</integer>
+			<key>type</key>
+			<string>EnabledFloat</string>
 			<key>name</key>
 			<string>restLength</string>
 			<key>displayName</key>
-			<string>Rest Length</string>
+			<string>Rest length</string>
 		</dict>
 		<dict>
 			<key>displayName</key>

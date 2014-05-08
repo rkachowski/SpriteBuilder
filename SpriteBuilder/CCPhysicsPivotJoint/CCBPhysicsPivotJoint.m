@@ -19,6 +19,8 @@
 {
     CCSprite * joint;
     CCSprite * jointAnchor;
+    
+
 }
 
 @synthesize anchorA;
@@ -39,14 +41,11 @@
 
 -(void)setupBody
 {
-    
-    joint = [CCSprite spriteWithImageNamed:@"joint-pivot.png"];
+	joint = [CCSprite spriteWithImageNamed:@"joint-pivot.png"];
     jointAnchor = [CCSprite spriteWithImageNamed:@"joint-anchor.png"];
     
     [scaleFreeNode addChild:joint];
     [scaleFreeNode addChild:jointAnchor];
-
-    
 }
 
 
@@ -55,13 +54,15 @@
     //If selected, display selected sprites.
     if(selectedBodyHandle & (1 << EntireJoint))
     {
-        joint.spriteFrame = [CCSpriteFrame frameWithImageNamed:@"joint-pivot-sel.png"];
-        jointAnchor.spriteFrame = [CCSpriteFrame frameWithImageNamed:@"joint-anchor-sel.png"];
+
+        joint.spriteFrame =       [self frameWithImageNamed:@"joint-pivot-sel.png"];
+        jointAnchor.spriteFrame = [self frameWithImageNamed:@"joint-anchor-sel.png"];
     }
+    //If its not selected na
     else
     {
-        joint.spriteFrame = [CCSpriteFrame frameWithImageNamed:@"joint-pivot.png"];
-        jointAnchor.spriteFrame = [CCSpriteFrame frameWithImageNamed:@"joint-anchor.png"];
+        joint.spriteFrame = [self frameWithImageNamed:@"joint-pivot.png"];
+        jointAnchor.spriteFrame = [self frameWithImageNamed:@"joint-anchor.png"];
     }
     
     [super updateSelectionUI];
@@ -79,9 +80,9 @@
     return NO;    
 }
 
+
 -(JointHandleType)hitTestJoint:(CGPoint)worldPos
 {
-    
     return JointHandleUnknown;
 }
 
@@ -101,7 +102,12 @@
 
 -(void)setBodyA:(CCNode *)aBodyA
 {
-    
+	bool bodyAChanges = false;
+    if(!bodyA || !aBodyA || bodyA.UUID != aBodyA.UUID)
+    {
+        bodyAChanges = true;
+    }
+
     [super setBodyA:aBodyA];
     
     if(!aBodyA)
@@ -111,7 +117,11 @@
         return;
     }
     
-    [self setPositionFromAnchor];
+	if(bodyAChanges)
+	{
+		[self setAnchorFromBodyA];
+	}
+	[self setPositionFromAnchor];
 }
 
 -(void)setPositionFromAnchor
@@ -121,7 +131,7 @@
     
     CGPoint worldPos = [self.bodyA convertToWorldSpace:self.anchorA];
     CGPoint nodePos = [self.parent convertToNodeSpace:worldPos];
-    _position = nodePos;
+    self.position = nodePos;
 }
 
 -(void)setAnchorFromBodyA
@@ -155,7 +165,6 @@
     if(jointAnchor)
     {
         CGPoint pointA = [jointAnchor convertToNodeSpaceAR:worlPos];
-        pointA = ccpAdd(pointA, ccp(0,3.0f * [CCDirector sharedDirector].UIScaleFactor));
         if(ccpLength(pointA) < 4.0f* [CCDirector sharedDirector].UIScaleFactor)
         {
             return BodyAnchorA;
@@ -200,10 +209,12 @@
     }
 }
 
--(void)onExit
+-(void)onEnter
 {
- 
+	[super onEnter];
+	[self setPositionFromAnchor];
 }
+
 
 -(void)dealloc
 {

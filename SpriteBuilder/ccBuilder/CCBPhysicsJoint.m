@@ -15,9 +15,10 @@
 #import "SequencerSequence.h"
 #import "AppDelegate.h"
 
-static const float kOutletOffset = 20.0f;
+static const float kOutletVerticalOffset = 20.0f;
+static const float kOutletHorizontalOffset = 8.0f;
 
-NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"position", @"scaleX", @"scaleY", @"rotation"};
+NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"position", @"scaleX", @"scaleY", @"rotation", @"anchorPoint"};
 
 
 
@@ -28,9 +29,6 @@ NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"positio
 }
 @dynamic bodyA;
 @dynamic bodyB;
-@synthesize breakingForceEnabled;
-@synthesize maxForceEnabled;
-
 
 - (id) init
 {
@@ -40,31 +38,63 @@ NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"positio
         return nil;
     }
     
+    spriteFrameCache = [NSMutableDictionary dictionary];
+    
     scaleFreeNode = [CCScaleFreeNode node];
     [self addChild:scaleFreeNode];
     
-    bodyAOutlet = [CCSprite spriteWithImageNamed:@"joint-outlet-unset.png"];
+	bodyOutletRoot = [CCNode node];
+	bodyOutletRoot.position = ccp([self outletHorizontalOffset],-[self outletVerticalOffset]);
+	bodyOutletRoot.positionType = CCPositionTypeUIPoints;
+	
+	CCSprite * outletBG = [CCSprite spriteWithImageNamed:@"joint-connection-bg.png"];
+	outletBG.positionType = CCPositionTypeUIPoints;
+	[bodyOutletRoot addChild:outletBG];
+	
+    bodyAOutlet = [CCSprite spriteWithImageNamed:@"joint-connection-disconnected.png"];
     bodyAOutlet.positionType = CCPositionTypeUIPoints;
-    bodyAOutlet.position = ccp(-kOutletOffset + [self outletLateralOffset], -kOutletOffset);
-    [scaleFreeNode addChild:bodyAOutlet];
+    bodyAOutlet.position = ccp(-kOutletHorizontalOffset, 0);
+    [bodyOutletRoot addChild:bodyAOutlet];
     
-    bodyBOutlet = [CCSprite spriteWithImageNamed:@"joint-outlet-unset.png"];
-    bodyBOutlet.position = ccp(kOutletOffset + [self outletLateralOffset], -kOutletOffset);
+    bodyBOutlet = [CCSprite spriteWithImageNamed:@"joint-connection-disconnected.png"];
+    bodyBOutlet.position = ccp(kOutletHorizontalOffset, 0);
     bodyBOutlet.positionType = CCPositionTypeUIPoints;
-    [scaleFreeNode addChild:bodyBOutlet];
-    
+	[bodyOutletRoot addChild:bodyBOutlet];
+   
+	[scaleFreeNode addChild:bodyOutletRoot];
+	
     self.breakingForceEnabled = NO;
     self.maxForceEnabled = NO;
-    self.breakingForce = INFINITY;
-    self.collideBodies = YES;
-    self.maxForce = INFINITY;
+    self.breakingForce = 100.0f;
+    self.collideBodies = NO;
+    self.maxForce = 100.0f;
     
     return self;
 }
 
--(float)outletLateralOffset
+-(CCSpriteFrame*)frameWithImageNamed:(NSString*)name;
+{
+    CCSpriteFrame * spriteFrame = spriteFrameCache[name];
+  
+    if(!spriteFrame)
+    {
+        [spriteFrameCache setObject:[CCSpriteFrame frameWithImageNamed:name] forKey:name];
+        spriteFrame = spriteFrameCache[name];
+    }
+   
+    return spriteFrame;
+    
+}
+
+
+-(float)outletHorizontalOffset
 {
     return 0.0f;
+}
+
+-(float)outletVerticalOffset
+{
+    return 30.0f;
 }
 
 -(void)setBodyA:(CCNode *)aBodyA
@@ -92,6 +122,14 @@ NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"positio
     bodyB_UUID = bodyB.UUID;
     [self addObserverBody:bodyB];
     [self refreshOutletStatus];
+}
+
+- (BOOL) locked
+{
+    if([super locked])
+        return YES;
+    
+    return self.parent.locked;
 }
 
 -(void)fixupReferences
@@ -123,8 +161,6 @@ NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"positio
         }
         node = node.parent;
     }
-    
-    
 }
 
 -(void)removeObserverBody:(CCNode*)body
@@ -142,99 +178,65 @@ NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"positio
     }
 }
 
--(BOOL)maxForceEnabled
-{
-    return maxForceEnabled;
-}
-
-
-
--(void)setMaxForceEnabled:(BOOL)lMaxForceEnabled
-{
-    maxForceEnabled = lMaxForceEnabled;
-    if(!maxForceEnabled)
-    {
-        [self willChangeValueForKey:@"maxForce"];
-        _maxForce = INFINITY;
-        [self didChangeValueForKey:@"maxForce"];
-    }
-    
-}
-
--(BOOL)breakingForceEnabled
-{
-    return breakingForceEnabled;
-}
-
--(void)setBreakingForceEnabled:(BOOL)lBreakingForceEnabled
-{
-    breakingForceEnabled = lBreakingForceEnabled;
-    if(!breakingForceEnabled)
-    {
-        [self willChangeValueForKey:@"breakingForce"];
-        _breakingForce = INFINITY;
-        [self didChangeValueForKey:@"breakingForce"];
-    }
-}
-
 -(CCNode*)bodyA
 {
-    CCNode * foundNode = [SceneGraph findUUID:bodyA_UUID rootNode:sceneGraph.rootNode];
+    CCNode * foundNode = [SceneGraph findUUID:bodyA_UUID node:sceneGraph.rootNode];
     //NSAssert(foundNode != nil, @"Did not find nod UUID:%i", (int)bodyA_UUID);
     return foundNode;
 }
 
 -(CCNode*)bodyB
 {
-    CCNode * foundNode = [SceneGraph findUUID:bodyB_UUID rootNode:sceneGraph.rootNode];
+    CCNode * foundNode = [SceneGraph findUUID:bodyB_UUID node:sceneGraph.rootNode];
     //NSAssert(foundNode != nil, @"Did not find nod UUID:%i", (int)bodyA_UUID);
     return foundNode;
 }
 
+-(BOOL)isDraggable
+{
+	return YES;
+}
 
--(void)visit
+
+-(void)visit:(CCRenderer *)renderer parentTransform:(const GLKMatrix4 *)parentTransform
 {
     [self updateSelectionUI];
-    [super visit];
+    [super visit:renderer parentTransform:parentTransform];
 }
 
 -(void)updateSelectionUI
 {
-    
     if(selectedBodyHandle & (1<<EntireJoint))
     {
-        bodyAOutlet.visible = self.bodyA ? NO : YES;
-        bodyBOutlet.visible = self.bodyB ? NO : YES;
+		bodyOutletRoot.visible = (self.bodyA && self.bodyB) ? NO : YES;
     }
     else
     {
-        bodyAOutlet.visible = NO;
-        bodyBOutlet.visible = NO;
+		bodyOutletRoot.visible = NO;
     }
-    
     
     //Outlet A
-    if(selectedBodyHandle & (1<<BodyOutletA))
+    if(selectedBodyHandle & (1<<BodyOutletA) || self.bodyA)
     {
-        bodyAOutlet.spriteFrame = [CCSpriteFrame frameWithImageNamed:@"joint-outlet-set.png"];
+        bodyAOutlet.spriteFrame = [self frameWithImageNamed:@"joint-connection-connected.png"];
     }
     else
     {
-        bodyAOutlet.spriteFrame = [CCSpriteFrame frameWithImageNamed:@"joint-outlet-unset.png"];
+        bodyAOutlet.spriteFrame = [self frameWithImageNamed:@"joint-connection-disconnected.png"];
     }
     [self removeJointHandleSelected:BodyOutletA];
     
     //Outlet B
-    if(selectedBodyHandle & (1<<BodyOutletB))
+    if(selectedBodyHandle & (1<<BodyOutletB) || self.bodyB)
     {
-        bodyBOutlet.spriteFrame = [CCSpriteFrame frameWithImageNamed:@"joint-outlet-set.png"];
+        bodyBOutlet.spriteFrame = [self frameWithImageNamed:@"joint-connection-connected.png"];
     }
     else
     {
-        bodyBOutlet.spriteFrame = [CCSpriteFrame frameWithImageNamed:@"joint-outlet-unset.png"];
+        bodyBOutlet.spriteFrame = [self frameWithImageNamed:@"joint-connection-disconnected.png"];
     }
+	
     [self removeJointHandleSelected:BodyOutletB];
-
     [self removeJointHandleSelected:EntireJoint];
 }
 
@@ -246,17 +248,14 @@ NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"positio
 {
 
     CGPoint pointA = [bodyAOutlet convertToNodeSpaceAR:worldPos];
-    
-    pointA = ccpAdd(pointA, ccp(0, 3.0f * [CCDirector sharedDirector].UIScaleFactor));
-    if(ccpLength(pointA) < 8.0f * [CCDirector sharedDirector].UIScaleFactor)
+    if(bodyA == nil &&  ccpLength(pointA) < 8.0f * [CCDirector sharedDirector].UIScaleFactor)
     {
         return BodyOutletA;
     }
     
     
     CGPoint pointB = [bodyBOutlet convertToNodeSpaceAR:worldPos];
-    pointB = ccpAdd(pointB, ccp(0, 3.0f * [CCDirector sharedDirector].UIScaleFactor));
-    if(ccpLength(pointB) < 8.0f * [CCDirector sharedDirector].UIScaleFactor)
+    if(bodyB == nil && ccpLength(pointB) < 8.0f * [CCDirector sharedDirector].UIScaleFactor)
     {
         return BodyOutletB;
     }
@@ -277,6 +276,11 @@ NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"positio
     selectedBodyHandle = ~(1<<handleType) & selectedBodyHandle;
 }
 
+-(void)clearJointHandleSelected
+{
+	selectedBodyHandle = 0x0;
+}
+
 -(void)setBodyHandle:(CGPoint)worldPos bodyType:(JointHandleType)bodyType
 {
     //Do nothing.
@@ -284,8 +288,8 @@ NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"positio
 
 -(void)refreshOutletStatus
 {
-    CCSpriteFrame * spriteFrameUnset = [CCSpriteFrame frameWithImageNamed:@"joint-outlet-unset.png"];
-    CCSpriteFrame * spriteFrameSet   = [CCSpriteFrame frameWithImageNamed:@"joint-outlet-set.png"];
+    CCSpriteFrame * spriteFrameUnset = [self frameWithImageNamed:@"joint-connection-disconnected.png"];
+    CCSpriteFrame * spriteFrameSet   = [self frameWithImageNamed:@"joint-connection-connected.png"];
     
     bodyAOutlet.spriteFrame = bodyA ? spriteFrameSet : spriteFrameUnset;
     bodyBOutlet.spriteFrame = bodyB ? spriteFrameSet : spriteFrameUnset;
@@ -321,6 +325,28 @@ NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"positio
     self.bodyB = nil;
 }
 
+-(void)setBreakingForceEnabled:(BOOL)breakingForceEnabled
+{
+	if(_breakingForceEnabled != breakingForceEnabled)
+	{
+		if(breakingForceEnabled && isinf(self.breakingForce))
+			self.breakingForce = 100.0f;
+	}
+	
+	_breakingForceEnabled = breakingForceEnabled;
+}
+
+-(void)setMaxForceEnabled:(BOOL)maxForceEnabled
+{
+	if(_maxForceEnabled != maxForceEnabled)
+	{
+		if(maxForceEnabled && isinf(self.maxForce))
+			self.maxForce = 100.0f;
+		
+	}
+	
+	_maxForceEnabled = maxForceEnabled;
+}
 
 #pragma PasteBoard
 
@@ -355,21 +381,6 @@ NSString *  dependantProperties[kNumProperties] = {@"skewX", @"skewY", @"positio
         default:
             return @"bodyB";
     }
-}
-
-- (BOOL) hidden
-{
-    if([SequencerHandler sharedHandler].currentSequence.timelinePosition != 0.0f || ![SequencerHandler sharedHandler].currentSequence.autoPlay)
-    {
-        return YES;
-    }
-    
-    if([AppDelegate appDelegate].playingBack)
-    {
-        return YES;
-    }
-    
-    return [super hidden];
 }
 
 

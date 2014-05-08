@@ -93,6 +93,15 @@
     else return NO;
 }
 
+-(BOOL)selectedNodeHasKeyframes
+{
+	if (![AppDelegate appDelegate].selectedNode)
+		return NO;
+	
+	return [AppDelegate appDelegate].selectedNode.hasKeyframes;
+	
+}
+
 - (BOOL) editingPhysicsBody
 {
     CCNode* node = [AppDelegate appDelegate].selectedNode;
@@ -408,6 +417,18 @@
             }
         }
     }
+	
+	//Filder bodies that are children of CCBPCCBFiles
+	[possibleBodies removeObjectsInArray:[possibleBodies where:^BOOL(CCNode* node, int idx) {
+		CCNode * parent = node.parent;
+		while (parent) {
+			if([[[parent class] description] isEqualToString:@"CCBPCCBFile"])
+				return YES;
+			parent=parent.parent;
+		}
+		return NO;
+	}]];
+	
     
     //Select the one we're closest too.
     
@@ -493,18 +514,18 @@
     }
     else if(jointHandleIndex == EntireJoint)
     {
+		
         //We've touched down in the centre of the joint. Do we allow it to translate?
-        
-        //If either of the outlets aren't filled out
+		//Return NO if its draggable so the parent can handle it.
         CCBPhysicsJoint * joint = (CCBPhysicsJoint*)node;
-        if(joint.bodyA == nil || joint.bodyB == nil)
-            return NO;
-        
-        return YES;
+		return !joint.isDraggable;
     
     }
     else if(jointHandleIndex != JointHandleUnknown)
     {
+        if(node.locked)
+            return NO;
+        
         if(jointHandleIndex == BodyOutletA || jointHandleIndex == BodyOutletB)
         {
             [self onOutletDown:event joint:(CCBPhysicsJoint*)node outletIdx:jointHandleIndex];
@@ -588,7 +609,8 @@
         
         CCBPhysicsJoint * joint = (CCBPhysicsJoint*)node;
         [joint setBodyHandle:pos bodyType:bodyDragging];
-        
+        [joint setJointHandleSelected:bodyDragging];
+		
         if([CocosScene cocosScene].currentTool != kCCBToolTranslate)
             [[CocosScene cocosScene] setCurrentTool: kCCBToolTranslate];
         
@@ -674,13 +696,28 @@
 {
     if(idx == BodyOutletA)
     {
+		if(joint.bodyB == body)
+		{
+			[[AppDelegate appDelegate] modalDialogTitle:@"Duplicate body connected." message:[NSString stringWithFormat:@"You've already connected BodyB to this physics body:%@",body.displayName]];
+			return;
+		}
+
         joint.bodyA = body;
-    
-        [joint setBodyHandle:worldPos bodyType:BodyAnchorA];
+		
+		if(![joint isMemberOfClass:[CCBPhysicsPivotJoint class]])
+			[joint setBodyHandle:worldPos bodyType:BodyAnchorA];
+		
         [[AppDelegate appDelegate] refreshProperty:@"bodyA"];
     }
     else
     {
+		if(joint.bodyA == body)
+		{
+			[[AppDelegate appDelegate] modalDialogTitle:@"Duplicate body connected." message:[NSString stringWithFormat:@"You've already connected BodyA to this physics body:%@",body.displayName]];
+			return;
+		}
+
+		
         joint.bodyB = body;
         [joint setBodyHandle:worldPos bodyType:BodyAnchorB];
         [[AppDelegate appDelegate] refreshProperty:@"bodyB"];
@@ -878,11 +915,14 @@
         {
             [joint setJointHandleSelected:type];
 
-            if([CocosScene cocosScene].currentTool != kCCBToolTranslate)
+            if(type != BodyOutletA && type != BodyOutletB &&  [CocosScene cocosScene].currentTool != kCCBToolTranslate)
                 [[CocosScene cocosScene] setCurrentTool: kCCBToolTranslate];
         }
-        else
+        else if(bodyDragging == JointHandleUnknown )
         {
+			[joint clearJointHandleSelected];
+			[joint setJointHandleSelected:EntireJoint];
+			
             if([CocosScene cocosScene].currentTool != kCCBToolSelection)
                 [[CocosScene cocosScene] setCurrentTool: kCCBToolSelection];
         }

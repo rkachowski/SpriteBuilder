@@ -8,7 +8,7 @@
 
 #import "cocos2d.h"
 
-static const int kNumProperties = 6;
+static const int kNumProperties = 7;
 extern NSString *  dependantProperties[kNumProperties];
 
 typedef enum
@@ -39,7 +39,8 @@ typedef enum
     UInt32 selectedBodyHandle;//bitfield
     
     CCNode * scaleFreeNode;
-    
+ 
+	CCNode   * bodyOutletRoot;
     CCSprite * bodyAOutlet;
     CCSprite * bodyBOutlet;
  
@@ -50,6 +51,8 @@ typedef enum
     CCNode    *bodyB;
     
     SceneGraph * sceneGraph;
+    
+    NSMutableDictionary * spriteFrameCache;
 }
 
 @property CCNode * bodyA;
@@ -60,15 +63,17 @@ typedef enum
 @property(nonatomic) BOOL breakingForceEnabled;
 @property(nonatomic) CGFloat breakingForce;
 
+@property(nonatomic,readonly) BOOL isDraggable;//The joint can be dragged by selecting only the body. Normally when not all body's are assigned.
 
 -(JointHandleType)hitTestJointHandle:(CGPoint)worlPos; //Which part of the joint did you hit? AnchorA/B Handle Min/Max?
 -(void)setJointHandleSelected:(JointHandleType)handleType; //Tell the renderer that a particular component is selected. Clears every frame.
 -(void)removeJointHandleSelected:(JointHandleType)handleType;
+-(void)clearJointHandleSelected;
 
 -(void)refreshOutletStatus;
 -(CGPoint)outletWorldPos:(JointHandleType)idx;
 -(void)setBodyHandle:(CGPoint)worldPos bodyType:(JointHandleType)bodyType;
-
+-(CCSpriteFrame*)frameWithImageNamed:(NSString*)name;
 
 -(void)fixupReferences;
 

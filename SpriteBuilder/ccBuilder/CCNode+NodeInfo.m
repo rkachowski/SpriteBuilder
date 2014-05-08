@@ -38,6 +38,10 @@
 #import "CCBDocument.h"
 #import "CustomPropSetting.h"
 #import "CocosScene.h"
+#import "NodePhysicsBody.h"
+#import "PhysicsHandler.h"
+
+NSString * kAnimationOfPhysicsWarning = @"kAnimationOfPhysicsWarning";
 
 @implementation CCNode (NodeInfo)
 
@@ -146,6 +150,24 @@
     return [dict objectForKey:name];
 }
 
+//Adjust the physics body to support animations.
+-(void)updatePhysicsBodyForAnimation
+{
+	//If physics body is dynamic, make static.
+	if(!self.nodePhysicsBody)
+		return;
+	
+	//Set dynamic bodies to be static if animating.
+	if(self.nodePhysicsBody.dynamic)
+	{
+		[[AppDelegate appDelegate] modalDialogTitle:@"Animation of physics bodies." message:@"Attemping to add a keyframe to a physics body. This will force the body to change from a static to a dynamic body." disableKey:kAnimationOfPhysicsWarning];
+		
+		self.nodePhysicsBody.dynamic = NO;
+
+	}
+	   
+}
+
 - (void) enableSequenceNodeProperty:(NSString*)name sequenceId:(int)seqId
 {
     // Check if animations are already enabled for this node property
@@ -200,6 +222,7 @@
     
     // Make sure timeline is enabled for this property
     [self enableSequenceNodeProperty:name sequenceId:seqId];
+	[self updatePhysicsBodyForAnimation];
     
     // Add the keyframe
     SequencerNodeProperty* seqNodeProp = [self sequenceNodeProperty:name sequenceId:seqId];
@@ -210,14 +233,18 @@
     [[AppDelegate appDelegate] updateInspectorFromSelection];
     [[SequencerHandler sharedHandler] redrawTimeline];
     [self updateProperty:name time:[SequencerHandler sharedHandler].currentSequence.timelinePosition sequenceId:seqId];
+	
+	[[AppDelegate appDelegate].physicsHandler willChangeValueForKey:@"selectedNodeHasKeyframes"];
+	[[AppDelegate appDelegate].physicsHandler didChangeValueForKey:@"selectedNodeHasKeyframes"];
 }
 
--(void)customVisit
+
+-(void)customVisit:(__unsafe_unretained CCRenderer *)renderer parentTransform:(const GLKMatrix4 *)parentTransform
 {
     if(self.hidden)
         return;
     
-    [self performSelector:@selector(oldVisit) withObject:nil];
+    [self performSelector:@selector(oldVisit:parentTransform:) withObject:renderer withObject:(__bridge id)(parentTransform)];
 }
 
 - (SequencerKeyframe*) addDefaultKeyframeForProperty:(NSString*)name atTime:(float)time sequenceId:(int)seqId
@@ -543,6 +570,10 @@
             deletedKeyframe = YES;
         }
     }
+	
+	[[AppDelegate appDelegate].physicsHandler willChangeValueForKey:@"selectedNodeHasKeyframes"];
+	[[AppDelegate appDelegate].physicsHandler didChangeValueForKey:@"selectedNodeHasKeyframes"];
+	
     return deletedKeyframe;
 }
 
@@ -648,6 +679,26 @@
         }
     }
     return NO;
+}
+
+-(BOOL)hasKeyframes
+{
+	NodeInfo* info = self.userObject;
+	
+	NSEnumerator* animPropEnum = [info.animatableProperties objectEnumerator];
+    NSDictionary* seq;
+    while ((seq = [animPropEnum nextObject]))
+    {
+        NSEnumerator* seqEnum = [seq objectEnumerator];
+        SequencerNodeProperty* prop;
+        while ((prop = [seqEnum nextObject]))
+        {
+			if(prop.keyframes.count > 0)
+				return YES;
+        }
+    }
+
+	return NO;
 }
 
 - (id) serializeAnimatedProperties

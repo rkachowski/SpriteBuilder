@@ -483,13 +483,19 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     {
         for (CCNode* node in nodes)
         {
+            //Don't display if special case rendering flag is present.
+            if([[node extraPropForKey:@"disableStageRendering"] boolValue])
+            {
+                continue;
+            }
+            
             if(node.locked)
             {
                 //Locked nodes shouldn't render
                 continue;
-  
             }
-            else
+            
+            
             {
                 CGPoint localAnchor = ccp(node.anchorPoint.x * node.contentSizeInPoints.width,
                                           node.anchorPoint.y * node.contentSizeInPoints.height);
@@ -1097,15 +1103,12 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     // Clicks inside objects
     [nodesAtSelectionPt removeAllObjects];
     
-    [[jointsLayer.children.firstObject children] forEach:^(CCNode * jointNode, int idx) {
+   
+	[self nodesUnderPt:pos rootNode:rootNode nodes:nodesAtSelectionPt];
+	
+	[[jointsLayer.children.firstObject children] forEach:^(CCNode * jointNode, int idx) {
         [self nodesUnderPt:pos rootNode:jointNode nodes:nodesAtSelectionPt];
     }];
-    
-    if(nodesAtSelectionPt.count == 0)
-    {
-        [self nodesUnderPt:pos rootNode:rootNode nodes:nodesAtSelectionPt];
-    }
-    
 
     currentNodeAtSelectionPtIdx = (int)[nodesAtSelectionPt count] -1;
     
@@ -1275,14 +1278,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
         
         if ([event modifierFlags] & NSShiftKeyMask)
         {
-            // Add to selection
-            NSMutableArray* modifiedSelection = [NSMutableArray arrayWithArray: appDelegate.selectedNodes];
-            
-            if (![modifiedSelection containsObject:clickedNode])
-            {
-                [modifiedSelection addObject:clickedNode];
-            }
-            appDelegate.selectedNodes = modifiedSelection;
+			[self addNodeToSelection:clickedNode];
         }
         else if (![appDelegate.selectedNodes containsObject:clickedNode]
                  && ! selectedNodeUnderClickPt)
@@ -1301,7 +1297,9 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
         }
     
         if (appDelegate.selectedNode != rootNode &&
-            ![[[appDelegate.selectedNodes objectAtIndex:0] parent] isKindOfClass:[CCLayout class]])
+            ![[[appDelegate.selectedNodes objectAtIndex:0] parent] isKindOfClass:[CCLayout class]]
+			//And if its not a joint, or if it is, its draggable.
+			&& (!appDelegate.selectedNode.plugIn.isJoint || [(CCBPhysicsJoint*)appDelegate.selectedNode isDraggable]))
         {
             currentMouseTransform = kCCBTransformHandleMove;
         }
@@ -1630,6 +1628,37 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     }
 }
 
+-(void)addNodeToSelection:(CCNode*)clickedNode
+{
+	// Add to/subtract from selection
+	NSMutableArray* modifiedSelection = [NSMutableArray arrayWithArray: appDelegate.selectedNodes];
+	
+	if ([modifiedSelection containsObject:clickedNode])
+	{
+		[modifiedSelection removeObject:clickedNode];
+	}
+	else
+	{
+		[modifiedSelection addObject:clickedNode];
+	}
+	
+	
+	//If we selected a joint. Only select one joint.
+	CCBPhysicsJoint * anyJoint = [modifiedSelection findLast:^BOOL(CCNode * node, int idx) {
+		return node.plugIn.isJoint;
+	}];
+	
+	if(anyJoint)
+	{
+		appDelegate.selectedNodes = @[anyJoint];
+	}
+	else
+	{
+		appDelegate.selectedNodes = modifiedSelection;
+	}
+
+}
+
 - (void) mouseUp:(NSEvent *)event
 {
     if (!appDelegate.hasOpenedDocument) return;
@@ -1646,25 +1675,13 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
         
         if ([event modifierFlags] & NSShiftKeyMask)
         {
-            // Add to/subtract from selection
-            NSMutableArray* modifiedSelection = [NSMutableArray arrayWithArray: appDelegate.selectedNodes];
+            [self addNodeToSelection:clickedNode];
             
-            if ([modifiedSelection containsObject:clickedNode])
-            {
-                [modifiedSelection removeObject:clickedNode];
-            }
-            else
-            {
-                [modifiedSelection addObject:clickedNode];
-                //currentMouseTransform = kCCBTransformHandleMove;
-            }
-            appDelegate.selectedNodes = modifiedSelection;
         }
         else
         {
             // Replace selection
             [appDelegate setSelectedNodes:[NSArray arrayWithObject:clickedNode]];
-            //currentMouseTransform = kCCBTransformHandleMove;
         }
         
         currentMouseTransform = kCCBTransformHandleNone;
@@ -1912,6 +1929,27 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     [self update:0];
 }
 
+-(BOOL)hideJoints
+{
+	if([SequencerHandler sharedHandler].currentSequence.timelinePosition != 0.0f || ![SequencerHandler sharedHandler].currentSequence.autoPlay)
+    {
+        return YES;
+    }
+    
+    if([AppDelegate appDelegate].playingBack)
+    {
+        return YES;
+    }
+	
+	if(![AppDelegate appDelegate].showJoints)
+	{
+		return YES;
+	}
+	
+	return NO;
+}
+
+
 - (void) update:(CCTime)delta
 {
     // Recenter the content layer
@@ -1948,7 +1986,8 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     // Update selection & physics editor
     [selectionLayer removeAllChildrenWithCleanup:YES];
     [physicsLayer removeAllChildrenWithCleanup:YES];
-    
+	jointsLayer.visible = ![self hideJoints];
+	
     if (appDelegate.physicsHandler.editingPhysicsBody || appDelegate.selectedNode.plugIn.isJoint)
     {
         [appDelegate.physicsHandler updatePhysicsEditor:physicsLayer];

@@ -30,6 +30,7 @@
 #import "SMTabBar.h"
 #import <HockeySDK/HockeySDK.h>
 #import "ProjectSettings.h"
+#import "CCNode+NodeInfo.h"
 
 #define kCCBNumCanvasDevices 14
 
@@ -119,8 +120,8 @@ enum {
 
 @protocol AppDelegate_UndeclaredSelectors <NSObject>
 @optional
-- (void) customVisit;
-- (void) oldVisit;
+- (void) customVisit:(__unsafe_unretained CCRenderer *)renderer parentTransform:(const GLKMatrix4 *)parentTransform;
+- (void) oldVisit:(__unsafe_unretained CCRenderer *)renderer parentTransform:(const GLKMatrix4 *)parentTransform;
 @end
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate, SMTabBarDelegate, BITCrashReportManagerDelegate>
@@ -313,6 +314,7 @@ enum {
 @property (nonatomic,assign) BOOL showGuides;
 @property (nonatomic,assign) BOOL snapToGuides;
 @property (nonatomic,assign) BOOL showStickyNotes;
+@property (nonatomic,assign) BOOL showJoints;
 
 @property (nonatomic,readonly) CCBTransparentView* guiView;
 @property (nonatomic,readonly) CCBTransparentWindow* guiWindow;
@@ -354,7 +356,7 @@ enum {
 - (void) openFile:(NSString*) fileName;
 
 // Publish commands
-- (void) publishAndRun:(BOOL)run runInBrowser:(NSString *)browser async:(BOOL)async;
+- (void)publishAndRun:(BOOL)run async:(BOOL)async;
 
 // Menu options
 - (void) dropAddSpriteNamed:(NSString*)spriteFile inSpriteSheet:(NSString*)spriteSheetFile at:(CGPoint)pt parent:(CCNode*)parent;
@@ -427,11 +429,10 @@ enum {
 
 // Publishing & running
 - (void) publisher:(CCBPublisher*)publisher finishedWithWarnings:(CCBWarnings*)warnings;
-- (IBAction) menuPublishProjectAndRun:(id)sender;
-- (IBAction)runProjectInXcode:(id)sender;
 
-// For warning messages
+// For warning messages. Returns result.
 - (void) modalDialogTitle: (NSString*)title message:(NSString*)msg;
+- (void) modalDialogTitle: (NSString*)title message:(NSString*)msg disableKey:(NSString*)key; //Allow show once behavior.
 
 // Modal status messages (progress)
 - (void) modalStatusWindowStartWithTitle:(NSString*)title;
@@ -443,7 +444,13 @@ enum {
 - (IBAction)visitCommunity:(id)sender;
 - (IBAction)showHelp:(id)sender;
 
+//Help dialogs.
+-(BOOL)showHelpDialog:(NSString*)type;
+-(void)disableHelpDialog:(NSString*)type;
+- (IBAction)runProjectInXcode:(id)sender;
+
 @property (weak) IBOutlet NSTableView *warningTableView;
 
 @property (weak) IBOutlet NSView *inspectorPhysics;
+
 @end

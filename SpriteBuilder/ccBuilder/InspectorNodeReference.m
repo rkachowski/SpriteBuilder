@@ -45,26 +45,27 @@
     }
     trackingTag = [self addTrackingRect:myFrame owner:self userData:nil assumeInside:NO];
     
-    imgOutletSet = [NSImage imageNamed:@"joint-outlet-set.png"];
-    imgOutletUnSet = [NSImage imageNamed:@"joint-outlet-unset.png"];
+    imgOutletSet = [NSImage imageNamed:@"inspector-body-connected.png"];
+    imgOutletUnSet = [NSImage imageNamed:@"inspector-body-disconnected.png"];
+	self.enabled = YES;
 
 }
 
 -(void)drawRect:(NSRect)dirtyRect
 {
+	float opacity = self.enabled ? 1.0f : 0.5f;
     if(self.inspector.reference)
     {
-        [imgOutletSet drawInRect:dirtyRect];
+        [imgOutletSet drawInRect:dirtyRect fromRect:NSZeroRect operation:NSCompositeSourceOver fraction:opacity];
         return;
     }
-    
-    if(mouseIsDown || mouseIsOver)
+    else if((mouseIsDown || mouseIsOver) && self.enabled)
     {
         [imgOutletSet drawInRect:dirtyRect];
     }
     else
     {
-        [imgOutletUnSet drawInRect:dirtyRect];
+        [imgOutletUnSet drawInRect:dirtyRect fromRect:NSZeroRect operation:NSCompositeSourceOver fraction:opacity];
     }
 }
 
@@ -139,13 +140,22 @@
 -(void)willBeAdded
 {
     self.outletButton.inspector = self;
+	self.outletButton.enabled = !self.readOnly;
 }
 
+-(void)setReadOnly:(BOOL)_readOnly
+{
+	[super setReadOnly:_readOnly];
+	self.outletButton.enabled = !self.readOnly;
+}
 
 -(void)onOutletDown:(id)sender event:(NSEvent*)event
 {
     if(self.reference)
         return;
+	
+	if(self.readOnly)
+		return;
     
     
     // Get the screen information.
@@ -254,11 +264,7 @@
     [self willChangeValueForKey:@"nodeName"];
     [self didChangeValueForKey:@"nodeName"];
     
-    if(self.reference != 0)
-    {
-        
-    }
-    
+	[self.outletButton setNeedsDisplay:YES];
 }
 
 - (IBAction)handleDeleteNode:(id)sender
@@ -268,7 +274,8 @@
 
 - (IBAction)handleGotoNode:(id)sender
 {
-    
+	if(self.reference)
+		[[AppDelegate appDelegate] setSelectedNodes:@[self.reference]];
 }
 
 
