@@ -34,6 +34,7 @@
 #import "RulersLayer.h"
 #import "GuidesLayer.h"
 #import "NotesLayer.h"
+#import "SnapLayer.h"
 #import "CCBTransparentWindow.h"
 #import "CCBTransparentView.h"
 #import "PositionPropertySetter.h"
@@ -60,6 +61,8 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
 
 @implementation CocosScene
 
+@synthesize bgLayer;
+@synthesize anchorPointCompensationLayer;
 @synthesize rootNode;
 @synthesize isMouseTransforming;
 @synthesize scrollOffset;
@@ -67,6 +70,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
 @synthesize guideLayer;
 @synthesize rulerLayer;
 @synthesize notesLayer;
+@synthesize snapLayer;
 @synthesize physicsLayer;
 
 +(id) sceneWithAppDelegate:(AppDelegate*)app
@@ -105,6 +109,9 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     notesLayer = [NotesLayer node];
     [self addChild:notesLayer z:6];
     
+    // Snapping
+    snapLayer = [SnapLayer node];
+    [self addChild:snapLayer z:3];
     
     // Selection layer
     selectionLayer = [CCNode node];
@@ -159,8 +166,13 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     contentLayer.name = @"contentLayer";
     contentLayer.contentSizeType = CCSizeTypeNormalized;
     contentLayer.contentSize = CGSizeMake(1, 1);
-    [stageBgLayer addChild:contentLayer];
     
+    anchorPointCompensationLayer = [CCNode node];
+    anchorPointCompensationLayer.contentSizeType = CCSizeTypeNormalized;
+    anchorPointCompensationLayer.contentSize = CGSizeMake(1, 1);
+    
+    [stageBgLayer addChild:anchorPointCompensationLayer];
+    [anchorPointCompensationLayer addChild:contentLayer];
     
     stageJointsLayer = [CCNode node];
     stageJointsLayer.name = @"stageJointsLayer";
@@ -362,7 +374,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
 
 - (void) setStageSize: (CGSize) size centeredOrigin:(BOOL)centeredOrigin
 {
-    
+    snapLinesNeedUpdate = YES; // This will cause the snap/alignment lines to update after undo/redo are called
     stageBgLayer.contentSize = size;
     stageJointsLayer.contentSize = size;
 
@@ -422,6 +434,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     stageJointsLayer.scale = zoom;
     
     stageZoom = zoom;
+    snapLinesNeedUpdate = YES;
 }
 
 - (float) stageZoom
@@ -500,7 +513,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
                 CGPoint localAnchor = ccp(node.anchorPoint.x * node.contentSizeInPoints.width,
                                           node.anchorPoint.y * node.contentSizeInPoints.height);
                 
-                CGPoint anchorPointPos = [node convertToWorldSpace:localAnchor];
+                CGPoint anchorPointPos = ccpRound([node convertToWorldSpace:localAnchor]);
                 
                 CCSprite* anchorPointSprite = [CCSprite spriteWithImageNamed:@"select-pt.png"];
                 anchorPointSprite.position = anchorPointPos;
@@ -1030,6 +1043,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     
     if ([notesLayer mouseDown:pos event:event]) return;
     if ([guideLayer mouseDown:pos event:event]) return;
+    [snapLayer mouseDown:pos event:event];
     if ([appDelegate.physicsHandler mouseDown:pos event:event]) return;
     
     mouseDownPos = pos;
@@ -1068,7 +1082,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
             
             // Transform anchor point
             currentMouseTransform = kCCBTransformHandleAnchorPoint;
-            transformScalingNode.transformStartPosition = transformScalingNode.anchorPoint;
+            transformScalingNode.startTransform = transformScalingNode.startTransform;
             return;
         }
         if(th == kCCBTransformHandleRotate && appDelegate.selectedNode != rootNode)
@@ -1255,7 +1269,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
 {
     if (!appDelegate.hasOpenedDocument) return;
     [self mouseMoved:event];
-    
+
     CGPoint pos = [[CCDirectorMac sharedDirector] convertEventToGL:event];
     
     if ([notesLayer mouseDragged:pos event:event]) return;
@@ -1291,9 +1305,8 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
         {
             if(selectedNode.locked)
                 continue;
-            
-            CGPoint pos = NSPointToCGPoint(selectedNode.positionInPoints);
-            selectedNode.transformStartPosition = [selectedNode.parent convertToWorldSpace:pos];
+          
+            selectedNode.startTransform = selectedNode.nodeToWorldTransform;
         }
     
         if (appDelegate.selectedNode != rootNode &&
@@ -1311,56 +1324,86 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
         {
             if(selectedNode.locked)
                 continue;
-            
-            float xDelta = (int)(pos.x - mouseDownPos.x);
-            float yDelta = (int)(pos.y - mouseDownPos.y);
-            
+          
+            CGPoint delta = ccp((int)(pos.x - mouseDownPos.x), (int)(pos.y - mouseDownPos.y));
+          
             // Handle shift key (straight drags)
             if ([event modifierFlags] & NSShiftKeyMask)
             {
-                if (fabs(xDelta) > fabs(yDelta))
+                if (fabs(delta.x) > fabs(delta.y))
                 {
-                    yDelta = 0;
+                    delta.y = 0;
                 }
                 else
                 {
-                    xDelta = 0;
+                    delta.x = 0;
                 }
             }
+          
+            CGAffineTransform startTransform = selectedNode.startTransform;
+            CGPoint newAbsPos = ccpAdd(selectedNode.transformStartPosition, delta);
+            CGPoint snapDelta = CGPointZero;
             
-            CGPoint newPos = ccp(selectedNode.transformStartPosition.x+xDelta, selectedNode.transformStartPosition.y+yDelta);
-            
-            // Snap to guides
-            /*
-            if (appDelegate.showGuides && appDelegate.snapToGuides)
+            // Guide Snap Rules
+            if ( ((appDelegate.showGuides && appDelegate.snapToGuides && appDelegate.snapToggle) ||
+                 (appDelegate.showGuideGrid && appDelegate.showGuideGrid && appDelegate.snapToggle)) &&
+                !([event modifierFlags] & NSCommandKeyMask))
             {
-                // Convert to absolute position (conversion need to happen in node space)
-                CGPoint newAbsPos = [selectedNode.parent convertToNodeSpace:newPos];
-                
-                newAbsPos = NSPointToCGPoint([PositionPropertySetter calcAbsolutePositionFromRelative:NSPointFromCGPoint(newAbsPos) type:positionType parentSize:parentSize]);
-                
-                newAbsPos = [selectedNode.parent convertToWorldSpace:newAbsPos];
-                
+                CGSize size = selectedNode.contentSizeInPoints;
+
                 // Perform snapping (snapping happens in world space)
-                newAbsPos = [guideLayer snapPoint:newAbsPos];
+                CGPoint snapDeltaAP = ccpSub([guideLayer snapPoint:newAbsPos], newAbsPos);
+                snapDelta = ccpAdd(snapDelta,snapDeltaAP);
                 
-                // Convert back to relative (conversion need to happen in node space)
-                newAbsPos = [selectedNode.parent convertToNodeSpace:newAbsPos];
+                CGPoint cornerBL = ccpAdd(CGPointApplyAffineTransform(ccp(0, 0), startTransform), delta);
+                CGPoint snapDeltaBL = ccpSub([guideLayer snapPoint:cornerBL], cornerBL);
                 
-                newAbsPos = NSPointToCGPoint([PositionPropertySetter calcRelativePositionFromAbsolute:NSPointFromCGPoint(newAbsPos) type:positionType parentSize:parentSize]);
+                // Unique Snaps
+                if(snapDelta.x!=snapDeltaBL.x && snapDelta.x==0) {
+                    snapDelta = ccpAdd(snapDelta,ccp(snapDeltaBL.x,0));
+                }
+                if(snapDelta.y!=snapDeltaBL.y && snapDelta.y==0) {
+                    snapDelta = ccpAdd(snapDelta,ccp(0,snapDeltaBL.y));
+                }
                 
-                newPos = [selectedNode.parent convertToWorldSpace:newAbsPos];
-            }
-             */
+                CGPoint cornerBR = ccpAdd(CGPointApplyAffineTransform(ccp(size.width, 0), startTransform), delta);
+                CGPoint snapDeltaBR = ccpSub([guideLayer snapPoint:cornerBR], cornerBR);
+                if(snapDelta.x!=snapDeltaBR.x && snapDelta.x==0) {
+                    snapDelta = ccpAdd(snapDelta,ccp(snapDeltaBR.x,0));
+                }
+                if(snapDelta.y!=snapDeltaBR.y && snapDelta.y==0) {
+                    snapDelta = ccpAdd(snapDelta,ccp(0,snapDeltaBR.y));
+                }
+                
+                CGPoint cornerTL = ccpAdd(CGPointApplyAffineTransform(ccp(0, size.height), startTransform), delta);
+                CGPoint snapDeltaTL = ccpSub([guideLayer snapPoint:cornerTL], cornerTL);
+                if(snapDelta.x!=snapDeltaTL.x && snapDelta.x==0) {
+                    snapDelta = ccpAdd(snapDelta,ccp(snapDeltaTL.x,0));
+                }
+                if(snapDelta.y!=snapDeltaTL.y && snapDelta.y==0) {
+                    snapDelta = ccpAdd(snapDelta,ccp(0,snapDeltaTL.y));
+                }
+       
+                CGPoint cornerTR = ccpAdd(CGPointApplyAffineTransform(ccp(size.width, size.height), startTransform), delta);
+                CGPoint snapDeltaTR = ccpSub([guideLayer snapPoint:cornerTR], cornerTR);
+                if(snapDelta.x!=snapDeltaTR.x && snapDelta.x==0) {
+                    snapDelta = ccpAdd(snapDelta,ccp(snapDeltaTR.x,0));
+                }
+                if(snapDelta.y!=snapDeltaTR.y && snapDelta.y==0) {
+                    snapDelta = ccpAdd(snapDelta,ccp(0,snapDeltaTR.y));
+                }
             
-        
-            CGPoint newLocalPos = [selectedNode.parent convertToNodeSpace:newPos];
+            }
+            
+            newAbsPos = ccpAdd(newAbsPos, snapDelta);
+            CGPoint newLocalPos = [selectedNode.parent convertToNodeSpace:newAbsPos];
             
             [appDelegate saveUndoStateWillChangeProperty:@"position"];
             
             selectedNode.position = [selectedNode convertPositionFromPoints:newLocalPos type:selectedNode.positionType];
         }
         [appDelegate refreshProperty:@"position"];
+        [snapLayer mouseDragged:pos event:event];
     }
     else if (currentMouseTransform == kCCBTransformHandleScale)
     {
@@ -1576,6 +1619,8 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
         [appDelegate saveUndoStateWillChangeProperty:@"anchorPoint"];
         transformScalingNode.anchorPoint = ccpAdd(transformScalingNode.transformStartPosition, deltaAnchorPoint);
         [appDelegate refreshProperty:@"anchorPoint"];
+        
+        [self updateAnchorPointCompensation];
     }
     else if (isPanning)
     {
@@ -1588,6 +1633,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
 
 - (void) updateAnimateablePropertyValue:(id)value propName:(NSString*)propertyName type:(int)type
 {
+    snapLinesNeedUpdate = YES;
     CCNode* selectedNode = appDelegate.selectedNode;
     
     NodeInfo* nodeInfo = selectedNode.userObject;
@@ -1742,6 +1788,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     
     if ([notesLayer mouseUp:pos event:event]) return;
     if ([guideLayer mouseUp:pos event:event]) return;
+    [snapLayer mouseUp:pos event:event];
     
     isMouseTransforming = NO;
     
@@ -1911,6 +1958,7 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
 
 - (void) scrollWheel:(NSEvent *)theEvent
 {
+    snapLinesNeedUpdate = YES; // Disabled in update
     if (!appDelegate.window.isKeyWindow) return;
     if (isMouseTransforming || isPanning || currentMouseTransform != kCCBTransformHandleNone) return;
     if (!appDelegate.hasOpenedDocument) return;
@@ -1922,11 +1970,19 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     scrollOffset.y = scrollOffset.y+dy;
 }
 
+#pragma mark Post update methods
+
+// This method is called once anytime the selection changes
+- (void)selectionUpdated {
+    snapLinesNeedUpdate = YES;
+}
+
 #pragma mark Updates every frame
 
 - (void) forceRedraw
 {
     [self update:0];
+    snapLinesNeedUpdate = YES; // Required after the update call to prevent lines from being in random places when switching screen sizes.
 }
 
 -(BOOL)hideJoints
@@ -1962,7 +2018,6 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     stageBgLayer.position = stageCenter;
     stageJointsLayer.position = stageCenter;
     renderedScene.position = stageCenter;
-    renderedScene.anchorPoint = ccp(0.0f, 0.0f);
     
     if (stageZoom <= 1 || !renderedScene)
     {
@@ -1982,7 +2037,6 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
         [renderedScene end];
         [borderDevice texture].antialiased = NO;
     }
-    
     // Update selection & physics editor
     [selectionLayer removeAllChildrenWithCleanup:YES];
     [physicsLayer removeAllChildrenWithCleanup:YES];
@@ -2024,13 +2078,17 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
     [rulerLayer updateMousePos:mousePos];
     
     // Update guides
-    guideLayer.visible = appDelegate.showGuides;
+    guideLayer.visible = (appDelegate.showGuides || appDelegate.showGuideGrid) && appDelegate.showExtras;
     [guideLayer updateWithSize:winSize stageOrigin:origin zoom:stageZoom];
     
     // Update sticky notes
-    notesLayer.visible = appDelegate.showStickyNotes;
+    notesLayer.visible = appDelegate.showStickyNotes && appDelegate.showExtras;
     [notesLayer updateWithSize:winSize stageOrigin:origin zoom:stageZoom];
     
+    // Update Node Snap
+    snapLayer.visible = appDelegate.snapNode && appDelegate.snapToggle;
+    [snapLayer updateWithSize:winSize stageOrigin:origin zoom:stageZoom];
+
     if (winSizeChanged)
     {
         // Update mouse tracking
@@ -2042,6 +2100,18 @@ static NSString * kZeroContentSizeImage = @"sel-round.png";
 				CGSize sizeInPixels = [[CCDirector sharedDirector] viewSizeInPixels];
         trackingArea = [[NSTrackingArea alloc] initWithRect:NSMakeRect(0, 0, sizeInPixels.width, sizeInPixels.height) options:NSTrackingMouseMoved | NSTrackingMouseEnteredAndExited | NSTrackingCursorUpdate | NSTrackingActiveInKeyWindow  owner:[appDelegate cocosView] userInfo:NULL];
         [[appDelegate cocosView] addTrackingArea:trackingArea];
+    }
+    
+    [self updateAnchorPointCompensation];
+}
+
+- (void) updateAnchorPointCompensation
+{
+    if (rootNode)
+    {
+        CGPoint compensation = ccp(rootNode.anchorPoint.x * contentLayer.contentSizeInPoints.width,
+                                   rootNode.anchorPoint.y * contentLayer.contentSizeInPoints.height);
+        anchorPointCompensationLayer.position = compensation;
     }
 }
 

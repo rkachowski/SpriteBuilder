@@ -32,6 +32,7 @@
 #import "SequencerSequence.h"
 #import "SequencerKeyframe.h"
 #import "SequencerNodeProperty.h"
+#import "SnapLayerKeys.h"
 
 @implementation InspectorValue
 
@@ -68,6 +69,8 @@
 
 - (void) refresh
 {
+    [self willChangeValueForKey:@"readOnly"];
+    [self didChangeValueForKey:@"readOnly"];
 }
 
 - (void) willBeAdded
@@ -76,6 +79,14 @@
 
 - (void) willBeRemoved
 {
+}
+
+-(BOOL)readOnly
+{
+    if([selection shouldDisableProperty:propertyName])
+        return YES;
+    
+    return readOnly;
 }
 
 - (void) updateAffectedProperties
@@ -94,6 +105,7 @@
     {
         [[AppDelegate appDelegate] updateInspectorFromSelection];
     }
+    [[NSNotificationCenter defaultCenter] postNotificationName:SnapLayerRefreshLines object:nil]; // Used to updated the snap/alignment lines after a property has been modified in the properties menu
 }
 
 - (id) propertyForSelection

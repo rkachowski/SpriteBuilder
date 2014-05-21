@@ -939,6 +939,21 @@
     [[[CCDirector sharedDirector] view] unlockOpenGLContext];
 }
 
+- (void)updateForNewFile:(NSString *)newFile
+{
+    for (RMDirectory *dir in activeDirectories)
+    {
+        NSString *dirPath = dir.dirPath;
+
+        if ([newFile rangeOfString:dirPath].location != NSNotFound)
+        {
+            [self updateResourcesForPath:dirPath];
+        }
+        return;
+    }
+}
+
+
 @dynamic mainActiveDirectoryPath; // prevent auto-synthesis of property ivar of the same name
 - (NSString*) mainActiveDirectoryPath
 {
@@ -965,11 +980,7 @@
     if ([res isEqualToString:@"phonehd"]) dstScale = 2;
     else if ([res isEqualToString:@"tablet"]) dstScale = 1 * tabletScale;
     else if ([res isEqualToString:@"tablethd"]) dstScale = 2 * tabletScale;
-    else if ([res isEqualToString:@"html5"])
-    {
-        dstScale = [AppDelegate appDelegate].projectSettings.publishResolutionHTML5_scale;
-    }
-    
+
     // Calculate src scale factor
     float srcScale = 1;
     if (srcScaleSetting)

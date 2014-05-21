@@ -160,7 +160,7 @@ NSString * kAnimationOfPhysicsWarning = @"kAnimationOfPhysicsWarning";
 	//Set dynamic bodies to be static if animating.
 	if(self.nodePhysicsBody.dynamic)
 	{
-		[[AppDelegate appDelegate] modalDialogTitle:@"Animation of physics bodies." message:@"Attemping to add a keyframe to a physics body. This will force the body to change from a static to a dynamic body." disableKey:kAnimationOfPhysicsWarning];
+		[[AppDelegate appDelegate] modalDialogTitle:@"Animation of physics bodies" message:@"Your are adding a keyframe to a node with a physics body. This will force the body to change from dynamic to static." disableKey:kAnimationOfPhysicsWarning];
 		
 		self.nodePhysicsBody.dynamic = NO;
 
@@ -241,7 +241,7 @@ NSString * kAnimationOfPhysicsWarning = @"kAnimationOfPhysicsWarning";
 
 -(void)customVisit:(__unsafe_unretained CCRenderer *)renderer parentTransform:(const GLKMatrix4 *)parentTransform
 {
-    if(self.hidden)
+    if([self.userObject isKindOfClass:[NodeInfo class]] &&  self.hidden)
         return;
     
     [self performSelector:@selector(oldVisit:parentTransform:) withObject:renderer withObject:(__bridge id)(parentTransform)];
@@ -879,6 +879,15 @@ NSString * kAnimationOfPhysicsWarning = @"kAnimationOfPhysicsWarning";
         else if ([prop isEqualToString:@"skew"]) return YES;
     }
     
+    //If I'm locked.
+    if(self.locked)
+        return YES;
+    
+    //If this is a joint and its parent is locked. (joints inherit locked behavior from the SequencerJoints object.
+    if(self.plugIn.isJoint && self.parent.locked)
+        return YES;
+    
+    
     // Disable position property for nodes handled by layouts
     if ([self.parent isKindOfClass:[CCLayout class]] && [prop isEqualToString:@"position"])
     {
@@ -888,16 +897,24 @@ NSString * kAnimationOfPhysicsWarning = @"kAnimationOfPhysicsWarning";
     return NO;
 }
 
+
+
+- (CGAffineTransform) startTransform;
+{
+    NodeInfo* info = self.userObject;
+    return info.startTransform;
+}
+
+- (void) setStartTransform:(CGAffineTransform)startTransform
+{
+    NodeInfo* info = self.userObject;
+    info.startTransform = startTransform;
+}
+
 - (CGPoint) transformStartPosition
 {
     NodeInfo* info = self.userObject;
-    return info.transformStartPosition;
-}
-
-- (void) setTransformStartPosition:(CGPoint)transformStartPosition
-{
-    NodeInfo* info = self.userObject;
-    info.transformStartPosition= transformStartPosition;
+    return CGPointApplyAffineTransform(self.anchorPointInPoints, info.startTransform);
 }
 
 - (void) setUsesFlashSkew:(BOOL)seqExpanded

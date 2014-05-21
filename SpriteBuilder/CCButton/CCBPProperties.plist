@@ -107,6 +107,14 @@
 		</dict>
 		<dict>
 			<key>displayName</key>
+			<string>Reset to default size</string>
+			<key>type</key>
+			<string>Button</string>
+			<key>name</key>
+			<string>onSetSizeFromTexture</string>
+		</dict>
+		<dict>
+			<key>displayName</key>
 			<string>Normal State</string>
 			<key>name</key>
 			<string>Normal State</string>
@@ -514,6 +522,26 @@
 			<string>FloatScale</string>
 			<key>name</key>
 			<string>fontSize</string>
+		</dict>
+		<dict>
+			<key>displayName</key>
+			<string>Alignment</string>
+			<key>type</key>
+			<string>IntegerLabeled</string>
+			<key>name</key>
+			<string>horizontalAlignment</string>
+			<key>extra</key>
+			<string>Left|0|Center|1|Right|2</string>
+		</dict>
+		<dict>
+			<key>displayName</key>
+			<string></string>
+			<key>type</key>
+			<string>IntegerLabeled</string>
+			<key>name</key>
+			<string>verticalAlignment</string>
+			<key>extra</key>
+			<string>Top|0|Center|1|Bottom|2</string>
 		</dict>
 		<dict>
 			<key>default</key>

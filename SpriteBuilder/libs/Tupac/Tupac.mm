@@ -434,14 +434,8 @@ typedef struct _PVRTexHeader
         CFRelease(colorSpace);
     }
     
-    if (self.previewFile)
-    {
-        // Generate preview file
-        [[NSFileManager defaultManager] copyItemAtPath:pngFilename toPath:self.previewFile error:NULL];
-    }
-    
+    [self generatePreviewImage:pngFilename];
 
-    
     NSError * error = nil;
 
     self.formatConverter = [FCFormatConverter defaultConverter];
@@ -536,6 +530,24 @@ typedef struct _PVRTexHeader
     return result;
 }
 
+- (void)generatePreviewImage:(NSString *)pngFilename
+{
+    if (self.previewFile)
+    {
+        NSError *error;
+        if (![[NSFileManager defaultManager] removeItemAtPath:self.previewFile error:&error])
+        {
+            NSLog(@"[TEXTUREPACKER] Error removing preview image %@: %@", self.previewFile, error);
+        }
+
+        error = nil;
+        if (![[NSFileManager defaultManager] copyItemAtPath:pngFilename toPath:self.previewFile error:&error])
+        {
+            NSLog(@"[TEXTUREPACKER] Error copying preview image from %@ to %@: %@", pngFilename, self.previewFile, error);
+        }
+    }
+}
+
 - (NSArray *) createTextureAtlasFromDirectoryPaths:(NSArray *)dirs
 {
     NSFileManager* fm = [NSFileManager defaultManager];
@@ -588,7 +600,6 @@ typedef struct _PVRTexHeader
 {
     [_formatConverter cancel];
     cancelled_ = YES;
-    [self setErrorMessage:@"Cancelled by user"];
 }
 
 @end

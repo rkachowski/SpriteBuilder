@@ -38,6 +38,7 @@
 #import "CCBSpriteSheetParser.h"
 #import "CCBUtil.h"
 #import "StageSizeWindow.h"
+#import "GuideGridSizeWindow.h"
 #import "ResolutionSettingsWindow.h"
 #import "PlugInManager.h"
 #import "InspectorPosition.h"
@@ -116,6 +117,7 @@
 #import "Cocos2dUpdater.h"
 #import "OALSimpleAudio.h"
 #import "XCodeRun.h"
+#import "SBUserDefaultsKeys.h"
 
 static const int CCNODE_INDEX_LAST = -1;
 
@@ -136,11 +138,16 @@ static const int CCNODE_INDEX_LAST = -1;
 @synthesize hasOpenedDocument;
 @synthesize defaultCanvasSize;
 @synthesize projectOutlineHandler;
+@synthesize showExtras;
 @synthesize showGuides;
+@synthesize showGuideGrid;
+@synthesize showStickyNotes;
+@synthesize snapToggle;
+@synthesize snapGrid;
 @synthesize snapToGuides;
+@synthesize snapNode;
 @synthesize guiView;
 @synthesize guiWindow;
-@synthesize showStickyNotes;
 @synthesize menuContextKeyframe;
 @synthesize menuContextKeyframeInterpol;
 @synthesize menuContextResManager;
@@ -481,7 +488,6 @@ typedef enum
     NSArray* topLevelObjs = NULL;
     [[NSBundle mainBundle] loadNibNamed:@"ResourceManagerPreviewView" owner:previewViewOwner topLevelObjects:&topLevelObjs];
     
-    
     for (id obj in topLevelObjs)
     {
         if ([obj isKindOfClass:[NSView class]])
@@ -489,6 +495,7 @@ typedef enum
             NSView* view = obj;
             
             [previewViewContainer addSubview:view];
+            view.frame = NSMakeRect(0.0, 0.0, previewViewContainer.frame.size.width, previewViewContainer.frame.size.height);
         }
     }
     
@@ -532,7 +539,9 @@ typedef enum
     [[BITHockeyManager sharedHockeyManager] startManager];
     
     [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithBool:YES] forKey:@"ApplePersistenceIgnoreState"];
-    
+
+    [self registerUserDefaults];
+
     UsageManager* usageManager = [[UsageManager alloc] init];
     [usageManager registerUsage];
     
@@ -599,20 +608,22 @@ typedef enum
     [self setupResourceManager];
     [self setupGUIWindow];
     [self setupProjectTilelessEditor];
-    
-    self.showGuides = YES;
-    self.snapToGuides = YES;
-    self.showStickyNotes = YES;
-	
+    [self setupExtras];
+
+    [window restorePreviousOpenedPanels];
+
     [self.window makeKeyWindow];
 	_applicationLaunchComplete = YES;
     
-    // Open files
     if (delayOpenFiles)
-	{
-		[self openFiles:delayOpenFiles];
-		delayOpenFiles = nil;
-	}
+    {
+        [self openFiles:delayOpenFiles];
+        delayOpenFiles = nil;
+    }
+    else
+    {
+        [self openLastOpenProject];
+    }
     
     // Check for first run
     if (![[[NSUserDefaults standardUserDefaults] objectForKey:@"completedFirstRun"] boolValue])
@@ -621,6 +632,27 @@ typedef enum
         
         // First run completed
         [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithBool:YES] forKey:@"completedFirstRun"];
+    }
+}
+
+- (void)registerUserDefaults
+{
+    NSDictionary *defaults = @{
+            LAST_VISIT_LEFT_PANEL_VISIBLE : @(1),
+            LAST_VISIT_BOTTOM_PANEL_VISIBLE : @(1),
+            LAST_VISIT_RIGHT_PANEL_VISIBLE : @(1)};
+
+    [[NSUserDefaults standardUserDefaults] registerDefaults:defaults];
+}
+
+- (void)openLastOpenProject
+{
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+    NSString *filePath = [defaults valueForKey:LAST_OPENED_PROJECT_PATH];
+    if (filePath)
+    {
+        [self openProject:filePath];
     }
 }
 
@@ -945,6 +977,7 @@ typedef enum
     InspectorValue* inspectorValue = [currentInspectorValues objectForKey:name];
     if (inspectorValue)
     {
+
         [inspectorValue refresh];
     }
 }
@@ -1129,14 +1162,20 @@ static BOOL hideAllToNextSeparator;
             NSString* type = [propInfo objectForKey:@"type"];
             NSString* name = [propInfo objectForKey:@"name"];
             NSString* displayName = [propInfo objectForKey:@"displayName"];
-            BOOL readOnly = [[propInfo objectForKey:@"readOnly"] boolValue];
+
             NSArray* affectsProps = [propInfo objectForKey:@"affectsProperties"];
             NSString* extra = [propInfo objectForKey:@"extra"];
             BOOL animated = [[propInfo objectForKey:@"animatable"] boolValue];
             BOOL isCodeConnection = [[propInfo objectForKey:@"codeConnection"] boolValue];
             BOOL inspectorDisabled = [[propInfo objectForKey:@"inspectorDisabled"] boolValue];
             if ([name isEqualToString:@"visible"]) animated = YES;
-            if ([self.selectedNode shouldDisableProperty:name]) readOnly = YES;
+
+            BOOL readOnly = [[propInfo objectForKey:@"readOnly"] boolValue];
+            
+            if ([self isDisabledProperty:name animatable:animated])
+            {
+                readOnly = YES;
+            }
             
             // Handle Flash skews
             BOOL usesFlashSkew = [self.selectedNode usesFlashSkew];
@@ -1145,12 +1184,7 @@ static BOOL hideAllToNextSeparator;
             if (!usesFlashSkew && [name isEqualToString:@"rotationalSkewY"]) continue;
             
             // Handle read only for animated properties
-            if ([self isDisabledProperty:name animatable:animated] ||
-                self.selectedNode.locked ||
-                (self.selectedNode.plugIn.isJoint && self.selectedNode.parent.locked))
-            {
-                readOnly = YES;
-            }
+
             
             //For the separators; should make this a part of the definition
             if (name == NULL) {
@@ -1390,6 +1424,10 @@ static BOOL hideAllToNextSeparator;
     
     [dict setObject:[NSNumber numberWithInt:doc.docDimensionsType] forKey:@"docDimensionsType"];
     
+    // Save Grid Spacing
+    //[dict setObject:[NSValue valueWithSize:(NSSize)[[CocosScene cocosScene].guideLayer gridSize]] forKey:@"gridspace"];
+    [dict setObject:[NSNumber numberWithInt:[CocosScene cocosScene].guideLayer.gridSize.width] forKey:@"gridspaceWidth"];
+    [dict setObject:[NSNumber numberWithInt:[CocosScene cocosScene].guideLayer.gridSize.height] forKey:@"gridspaceHeight"];
     
     //////////////    //////////////    //////////////    //////////////    //////////////
     //Joints
@@ -1720,6 +1758,14 @@ static BOOL hideAllToNextSeparator;
         [[CocosScene cocosScene].notesLayer removeAllNotes];
     }
     
+    // Restore Grid Spacing
+    id gridspaceWidth  = [doc objectForKey:@"gridspaceWidth"];
+    id gridspaceHeight = [doc objectForKey:@"gridspaceHeight"];
+    if(gridspaceWidth && gridspaceHeight) {
+        CGSize gridspace = CGSizeMake([gridspaceWidth intValue],[gridspaceHeight intValue]);
+        [[CocosScene cocosScene].guideLayer setGridSize:gridspace];
+   }
+
     // Restore selections
     self.selectedNodes = loadedSelectedNodes;
     
@@ -1801,6 +1847,7 @@ static BOOL hideAllToNextSeparator;
     [[CocosScene cocosScene].guideLayer removeAllGuides];
     [[CocosScene cocosScene].notesLayer removeAllNotes];
     [[CocosScene cocosScene].rulerLayer mouseExited:NULL];
+    [self setupExtras]; // Reset
     self.currentDocument = NULL;
     sequenceHandler.currentSequence = NULL;
     
@@ -2091,7 +2138,6 @@ static BOOL hideAllToNextSeparator;
     int currentResolution = currentDocument.currentResolution;
     SequencerSequence* currentSeq = sequenceHandler.currentSequence;
     
-    currentDocument.currentResolution = 0;
     sequenceHandler.currentSequence = [currentDocument.sequences objectAtIndex:0];
     sequenceHandler.currentSequence.timelinePosition = 0;
     [self reloadResources];
@@ -2237,6 +2283,8 @@ static BOOL hideAllToNextSeparator;
     [[CocosScene cocosScene] setScrollOffset:ccp(0,0)];
     
     [self checkForTooManyDirectoriesInCurrentDoc];
+
+    [[ResourceManager sharedManager] updateForNewFile:fileName];
 }
 
 /*
@@ -3076,12 +3124,10 @@ static BOOL hideAllToNextSeparator;
     [self switchToDocument:oldCurDoc forceReload:NO];
 }
 
-
-- (void)publishAndRun:(BOOL)run async:(BOOL)async
+- (void)checkForDirtyDocumentAndPublishAsync:(BOOL)async
 {
     if (!projectSettings.publishEnabledAndroid
-        && !projectSettings.publishEnablediPhone
-        && !projectSettings.publishEnabledHTML5)
+        && !projectSettings.publishEnablediPhone)
     {
         if(async)
             [self modalDialogTitle:@"Published Failed" message:@"There are no configured publish target platforms. Please check your Publish Settings."];
@@ -3106,7 +3152,7 @@ static BOOL hideAllToNextSeparator;
                 // Falling through to publish
             case NSAlertOtherReturn:
                 // Open progress window and publish
-                [self publishStartAsync:async run:run];
+                [self publishStartAsync:async];
                 break;
             default:
                 break;
@@ -3114,11 +3160,11 @@ static BOOL hideAllToNextSeparator;
     }
     else
     {
-        [self publishStartAsync:async run:run];
+        [self publishStartAsync:async];
     }
 }
 
-- (void)publishStartAsync:(BOOL)async run:(BOOL)run
+- (void)publishStartAsync:(BOOL)async
 {
     CCBWarnings* warnings = [[CCBWarnings alloc] init];
     warnings.warningsDescription = @"Publisher Warnings";
@@ -3127,7 +3173,6 @@ static BOOL hideAllToNextSeparator;
     CCBPublisher* publisher = [[CCBPublisher alloc] initWithProjectSettings:projectSettings warnings:warnings];
     modalTaskStatusWindow = [[TaskStatusWindow alloc] initWithWindowNibName:@"TaskStatusWindow"];
     publisher.taskStatusUpdater = modalTaskStatusWindow;
-    publisher.runAfterPublishing = run;
 
     // Open progress window and publish
     if (async)
@@ -3164,7 +3209,7 @@ static BOOL hideAllToNextSeparator;
 
 - (IBAction) menuPublishProject:(id)sender
 {
-    [self publishAndRun:NO async:YES];
+    [self checkForDirtyDocumentAndPublishAsync:YES];
 }
 
 - (IBAction)runProjectInXcode:(id)sender
@@ -3748,113 +3793,6 @@ static BOOL hideAllToNextSeparator;
     NSSegmentedControl* sc = sender;
     
     cs.currentTool = [sc selectedSegment];
-}
-
-- (IBAction) pressedPanelVisibility:(id)sender
-{
-    NSSegmentedControl* sc = sender;
-    [window disableUpdatesUntilFlush];
-    
-    // Left Panel
-    if ([sc isSelectedForSegment:0]) {
-        
-        if ([leftPanel isHidden]) {
-            // Show left panel & shrink splitHorizontalView
-            NSRect origRect = leftPanel.frame;
-            NSRect transitionFrame = NSMakeRect(0,
-                                                origRect.origin.y,
-                                                origRect.size.width,
-                                                origRect.size.height);
-                                                     
-            [leftPanel setFrame:transitionFrame];
-            origRect = splitHorizontalView.frame;
-            transitionFrame = NSMakeRect(leftPanel.frame.size.width,
-                                         origRect.origin.y,
-                                         origRect.size.width-leftPanel.frame.size.width,
-                                         origRect.size.height);
-                                               
-            [splitHorizontalView setFrame:transitionFrame];
-            
-            [leftPanel setHidden:NO];
-            [leftPanel setNeedsDisplay:YES];
-            [splitHorizontalView setNeedsDisplay:YES];
-        }
-    } else {
-        
-        if (![leftPanel isHidden]) {
-            // Hide left panel & expand splitView
-            NSRect origRect = leftPanel.frame;
-            NSRect transitionFrame = NSMakeRect(-origRect.size.width,
-                                                 origRect.origin.y,
-                                                 origRect.size.width,
-                                                 origRect.size.height);
-                                                      
-            [leftPanel setFrame:transitionFrame];
-            origRect = splitHorizontalView.frame;
-            transitionFrame = NSMakeRect(0,
-                                         origRect.origin.y,
-                                         origRect.size.width+leftPanel.frame.size.width,
-                                         origRect.size.height);
-                                         
-            [splitHorizontalView setFrame:transitionFrame];
-            
-            [leftPanel setHidden:YES];
-            [leftPanel setNeedsDisplay:YES];
-            [splitHorizontalView setNeedsDisplay:YES];
-        }
-    }
-    
-    
-    // Right Panel (InspectorScroll)
-    if ([sc isSelectedForSegment:2]) {
-        
-        if ([rightPanel isHidden]) {
-            // Show right panel & shrink splitView
-            [rightPanel setHidden:NO];
-            NSRect origRect = rightPanel.frame;
-            NSRect transitionFrame = NSMakeRect(origRect.origin.x-origRect.size.width,
-                                                origRect.origin.y,
-                                                origRect.size.width,
-                                                origRect.size.height);
-                                                
-            [rightPanel setFrame:transitionFrame];
-            origRect = splitHorizontalView.frame;
-            transitionFrame = NSMakeRect(origRect.origin.x,
-                                        origRect.origin.y,
-                                        origRect.size.width-rightPanel.frame.size.width,
-                                         origRect.size.height);
-                                        
-            [splitHorizontalView setFrame:transitionFrame];
-            [rightPanel setNeedsDisplay:YES];
-            [splitHorizontalView setNeedsDisplay:YES];
-        }
-    } else {
-        
-        if (![rightPanel isHidden]) {
-            // Hide right panel & expand splitView
-            NSRect origRect = rightPanel.frame;
-            NSRect transitionFrame = NSMakeRect(origRect.origin.x+origRect.size.width,
-                                                origRect.origin.y,
-                                                origRect.size.width,
-                                                origRect.size.height);
-                                                      
-            [rightPanel setFrame:transitionFrame];
-            origRect = splitHorizontalView.frame;
-            transitionFrame = NSMakeRect(origRect.origin.x,
-                                         origRect.origin.y,
-                                         origRect.size.width+rightPanel.frame.size.width,
-                                         origRect.size.height);
-                                               
-            [splitHorizontalView setFrame:transitionFrame];
-            [rightPanel setHidden:YES];
-            [rightPanel setNeedsDisplay:YES];
-            [splitHorizontalView setNeedsDisplay:YES];
-        }
-    }
-    
-    if ([sc selectedSegment] == 1) {
-        [splitHorizontalView toggleBottomView:[sc isSelectedForSegment:1]];
-    }
 }
 
 - (int) uniqueSequenceIdFromSequences:(NSArray*) seqs
@@ -4717,6 +4655,52 @@ static BOOL hideAllToNextSeparator;
     return currentDocument.undoManager;
 }
 
+#pragma mark Extras / Snap
+
+- (void)setupExtras
+{
+    // Default Extras
+    self.showExtras      = YES;
+    self.showGuides      = YES;
+    self.showGuideGrid   = NO;
+    self.showStickyNotes = YES;
+    
+    // Default Snap
+    self.snapToggle      = YES;
+    self.snapToGuides    = YES;
+    self.snapGrid        = NO;
+    self.snapNode        = NO;
+}
+
+-(void) setShowGuides:(BOOL)showGuidesNew {
+    showGuides = showGuidesNew;
+    [[[CocosScene cocosScene] guideLayer] updateGuides];
+}
+
+-(void) setShowGuideGrid:(BOOL)showGuideGridNew {
+    showGuideGrid = showGuideGridNew;
+    [[[CocosScene cocosScene] guideLayer] updateGuides];
+}
+
+- (IBAction) menuGuideGridSettings:(id)sender
+{
+    if (!currentDocument) return;
+
+    GuideGridSizeWindow* wc = [[GuideGridSizeWindow alloc] initWithWindowNibName:@"GuideGridSizeWindow"];
+    
+    wc.wStage = [[[CocosScene cocosScene] guideLayer] gridSize].width;
+    wc.hStage = [[[CocosScene cocosScene] guideLayer] gridSize].height;
+    
+    int success = [wc runModalSheetForWindow:window];
+    if (success)
+    {
+        CGSize newSize = CGSizeMake(wc.wStage,wc.hStage);
+        
+        [[[CocosScene cocosScene] guideLayer] setGridSize:newSize];
+        [[[CocosScene cocosScene] guideLayer] updateGuides];
+    }
+}
+
 #pragma mark Playback countrols
 
 - (void) updatePlayback
@@ -4849,17 +4833,52 @@ static BOOL hideAllToNextSeparator;
 {
     if ([self hasDirtyDocument])
     {
-        NSAlert* alert = [NSAlert alertWithMessageText:@"Quit SpriteBuilder" defaultButton:@"Cancel" alternateButton:@"Quit" otherButton:NULL informativeTextWithFormat:@"There are unsaved documents. If you quit now you will lose any changes you have made."];
+        NSAlert* alert = [NSAlert alertWithMessageText:@"Quit SpriteBuilder"
+                                         defaultButton:@"Cancel"
+                                       alternateButton:@"Quit"
+                                           otherButton:@"Save All & Quit"
+                             informativeTextWithFormat:@"There are unsaved documents. If you quit now you will lose any changes you have made."];
+
         [alert setAlertStyle:NSWarningAlertStyle];
         NSInteger result = [alert runModal];
-        if (result == NSAlertDefaultReturn) return NO;
+
+        if (result == NSAlertOtherReturn)
+        {
+            [self saveAllDocuments:nil];
+            return YES;
+        }
+
+        if (result == NSAlertDefaultReturn)
+        {
+            return NO;
+        }
     }
     return YES;
 }
 
 - (void) windowWillClose:(NSNotification *)notification
 {
+    [window saveMainWindowPanelsVisibility];
+
+    [self saveOpenProjectPathToDefaults];
+
     [[NSApplication sharedApplication] terminate:self];
+}
+
+- (void)saveOpenProjectPathToDefaults
+{
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *projectPath = @"";
+    if (projectSettings) {
+		projectPath = projectSettings.projectPath;
+		projectPath = [projectPath stringByDeletingLastPathComponent];
+        [defaults setObject:projectPath forKey:LAST_OPENED_PROJECT_PATH];
+	}
+    else
+    {
+        [defaults removeObjectForKey:LAST_OPENED_PROJECT_PATH];
+    }
+    [defaults synchronize];
 }
 
 - (NSSize) windowWillResize:(NSWindow *)sender toSize:(NSSize)frameSize
