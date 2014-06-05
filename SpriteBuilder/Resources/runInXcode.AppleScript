@@ -1,7 +1,6 @@
 tell application "Xcode"
 	ignoring application responses
 		activate
-		# open "/Users/nickyweber/dev/Apportable/SBProjects/update.spritebuilder/update.xcodeproj"
 		open "ABSOLUTE_PATH_TO_PROJECT"
 	end ignoring
 end tell
