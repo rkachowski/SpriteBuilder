@@ -1,5 +1,6 @@
 require "rake/clean"
 require "json"
+require "fileutils"
 
 #
 ### Helper Methods
@@ -57,6 +58,7 @@ DEFAULT_PRODUCT_NAME="SpriteBuilder"
 #
 
 directory "Generated"
+directory "Build"
 
 file "Generated/#{TEMPLATE_FILENAME}.zip" => ["Generated", *ABSOLUTE_TEMPLATE_FILES] do |task|
     puts "Generating #{task.name()}..."
@@ -101,7 +103,7 @@ namespace :build do
     task :generated => [:template, "Generated/Version.txt","Generated/cocos2d_version.txt"] do
     end
 
-    task :tests => :build_requirements do
+    task :tests => [:generated,:build_requirements] do
         sh "xctool -configuration Testing build-tests"
     end
 end
@@ -113,6 +115,26 @@ task :test => ["build:tests", :build_requirements] do
     sh "xctool -configuration Testing run-tests"
 end
 
+desc "Build SpriteBuilder distribution - requires a version number VERSION=<semantic version>"
+task :package => ["Build", :test, "build:generated", :build_requirements] do
+    unless ENV["VERSION"]
+        fail "Version number not passed - set one with `VERSION=<semantic version> rake package` on the commandline"
+    end
+
+    sh "xctool VERSION=#{ENV["VERSION"]} -configuration Release build"
+    sh "xctool VERSION=#{ENV["VERSION"]} -configuration Release archive -archivePath Build/SpriteBuilder"
+
+    app = "./SpriteBuilder/Build/SpriteBuilder/Build/Products/Release/SpriteBuilder.app"
+    symbols = "./SpriteBuilder/Build/SpriteBuilder/Build/Products/Release/SpriteBuilder.app.dSYM"
+
+    unless File.exists? app and File.exists? symbols
+        fail "Build products don't exist at #{app} and #{symbols}"
+    end
+
+    FileUtils.cp app, "Build/"
+    FileUtils.cp symbols, "Build/"
+end
+
 build_dirs =  `find . -type d -iname build`.split
 CLEAN.include *build_dirs
-CLOBBER << "Generated"
+CLOBBER << "Generated", "Build"
