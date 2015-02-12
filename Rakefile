@@ -131,10 +131,10 @@ task :package => ["Build", :test, "build:generated", :build_requirements] do
         fail "Build products don't exist at #{app} and #{symbols}"
     end
 
-    FileUtils.cp app, "Build/"
-    FileUtils.cp symbols, "Build/"
+    FileUtils.cp_r app, "Build"
+    FileUtils.cp_r symbols, "Build"
 end
 
 build_dirs =  `find . -type d -iname build`.split
 CLEAN.include *build_dirs
-CLOBBER << "Generated", "Build"
+CLOBBER.include *["Generated", "Build"]
